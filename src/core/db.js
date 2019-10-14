@@ -1,10 +1,10 @@
 const autoTranslate = require("./auto");
 const Sequelize = require('sequelize');
 const logger = require("./logger");
-
+const Op = Sequelize.Op;
 const db = new Sequelize(process.env.DATABASE_URL, {
-  //logging: console.log,
-  logging: null,
+  logging: console.log,
+  //logging: null,
 });
 
 db
@@ -147,6 +147,27 @@ exports.channelTasks = function(data)
   }
 
 }
+// --------------------------------
+// Get tasks for channel or user
+// --------------------------------
+
+exports.getTasks = function(origin, dest, cb)
+{
+
+   if (dest === "me") {
+        return Tasks.findAll({ where: { origin: origin, dest: dest } }, {raw:true}).then(
+          function (result, err) {
+            cb(err, result);
+          });
+    }
+
+    return Tasks.findAll({ where: { origin: origin } }, {raw:true}).then(
+      function (result, err) {
+        cb(err, result);
+      });
+
+}
+
 
 // --------------------------------
 // Check if dest is found in tasks
@@ -157,13 +178,13 @@ exports.checkTask = function(origin, dest, cb)
 
    if (dest === "all") {
         return Tasks.findAll({ where: { origin: origin } }, {raw:true}).then(
-          function (err, result) {
+          function (result, err) {
             cb(err, result);
           });
     }
 
     return Tasks.findAll({ where: { origin: origin, dest: dest } }, {raw:true}).then(
-      function (err, result) {
+      function (result, err) {
         cb(err, result);
       });
 
@@ -175,17 +196,19 @@ exports.checkTask = function(origin, dest, cb)
 
 exports.removeTask = function(origin, dest, cb)
 {
+   console.log("removeTask()");
    if (dest === "all")
    {
+       console.log("removeTask() - all");
        return Tasks.destroy({ where: { [Op.or]: [{ origin: origin },{ dest: origin }] } }).then(
          function (err, result) {
-           cb(err);
+           cb(null, result);
          });;
    }
 
    return Tasks.destroy({ where: { [Op.or]: [{ origin: origin, dest: dest },{ origin: dest, dest: origin }] } }).then(
      function (err, result) {
-       cb(err);
+       cb(null, result);
      });;
 
 };
@@ -277,16 +300,16 @@ exports.increaseServers = function(id)
 exports.getStats = function(cb)
 {
 
-  return db.query(`select * from (select sum(count) as "totalCount",` +
-  `count(id)-1 as "totalServers" from servers) as table1,` +
-  `(select count(id)-1 as "activeSrv" from servers where active = TRUE) as table2,` +
-  `(select lang as "botLang" from servers where id = "bot") as table3,` +
-  `(select count(distinct origin) as "activeTasks"` +
-  `from tasks where active = TRUE) as table4,` +
-  `(select count(distinct origin) as "activeUserTasks"` +
-  `from tasks where active = TRUE and origin like "@%") as table5;`, { type: sequelize.QueryTypes.SELECT}).then(
-      function(err, result) {
-        cb(err, result);
+  return db.query(`select * from (select sum(count) as "totalCount", ` +
+  `count(id)-1 as "totalServers" from servers) as table1, ` +
+  `(select count(id)-1 as "activeSrv" from servers where active = TRUE) as table2, ` +
+  `(select lang as "botLang" from servers where id = 'bot') as table3, ` +
+  `(select count(distinct origin) as "activeTasks" ` +
+  `from tasks where active = TRUE) as table4, ` +
+  `(select count(distinct origin) as "activeUserTasks" ` +
+  `from tasks where active = TRUE and origin like '@%') as table5;`, { type: Sequelize.QueryTypes.SELECT}).then(
+      function(result) {
+        cb(null, result);
       }
     );
 
@@ -305,8 +328,8 @@ exports.getServerInfo = function(id, cb)
    `from tasks where server = ?) as table2,` +
    `(select count(distinct origin) as "activeUserTasks"` +
    `from tasks where origin like '@%' and server = ?) as table3;`, { replacements: [ id, id, id], type: db.QueryTypes.SELECT}).then( 
-    function (err, result) {
-      cb(err, result);
+    function (result) {
+      cb(null, result);
   });
    
 };
